@@ -61,5 +61,5 @@ async def create_user(ctx,*,user: discord.User):
 if repl:
   from keep_alive import keep_alive
   keep_alive()
-loggin.info('starting bot')
+logging.info('starting bot')
 client.run(os.getenv('TOKEN'))
