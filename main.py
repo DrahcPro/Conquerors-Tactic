@@ -16,6 +16,7 @@ intents = discord.Intents().all()
 client = commands.Bot(command_prefix="n@",intents=intents)
 
 #On_ready - everytime discord bot gets started
+@client.event
 async def on_ready():
   channel = client.get_channel(testingChannel)
   await channel.send('We are online')
@@ -33,4 +34,5 @@ async def ping(ctx,arg=""):
 if repl:
   from keep_alive import keep_alive
   keep_alive()
+print('starting bot')
 client.run(os.getenv('TOKEN'))
