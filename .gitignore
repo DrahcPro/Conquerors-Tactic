@@ -2,3 +2,7 @@
 *.breakpoints
 *.lock
 *.toml
+
+keepalive.py
+
+_pycache_/
