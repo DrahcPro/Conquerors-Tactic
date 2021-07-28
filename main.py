@@ -21,6 +21,13 @@ async def on_ready():
   await channel.send('We are online')
   print('bot is online')
 
+#Ping - to check for state of bot
+@client.command()
+async def ping(ctx,arg=""):
+  await ctx.send("pong")
+  if arg == "+":
+    await ctx.send(f"measured: {client.latency}")
+
 #Starting the bot
 if repl:
   from keep_alive import keep_alive
