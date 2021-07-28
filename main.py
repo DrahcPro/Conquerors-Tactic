@@ -24,6 +24,7 @@ async def on_ready():
 #Ping - to check for state of bot
 @client.command()
 async def ping(ctx,arg=""):
+  print("ping command registered")
   await ctx.send("pong")
   if arg == "+":
     await ctx.send(f"measured: {client.latency}")
