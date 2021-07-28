@@ -4,5 +4,7 @@
 *.toml
 
 keep_alive.py
+player.yml
 
 _pycache_/
+storage/playerDB

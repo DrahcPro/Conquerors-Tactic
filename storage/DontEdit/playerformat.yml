@@ -1,0 +1,14 @@
+info:
+  id: <id>
+  name: <name>
+stats:
+  range: 1
+  #attack range (in tiles) upgradeable
+character:
+  lifes: 3
+  #out of 3, can't be bought extra
+  tokens: 1
+  #spending power
+gameinfo:
+  x-location: 0
+  y-location: 0
