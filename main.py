@@ -1,3 +1,4 @@
+repl = True
 if False: #True if it shouldn't be running, False if it should
   print('escaping')
   exit()
@@ -7,7 +8,7 @@ if False: #True if it shouldn't be running, False if it should
 from discord.ext import commands
 import discord, os
 
-#Permenant variables
+#Permanent variables
 testingChannel = 869998032324804618
 
 #Functional code------------------
@@ -18,6 +19,10 @@ client = commands.Bot(command_prefix="n@",intents=intents)
 async def on_ready():
   channel = client.get_channel(testingChannel)
   await channel.send('We are online')
+  print('bot is online')
 
 #Starting the bot
+if repl:
+  from keep_alive import keep_alive
+  keep_alive()
 client.run(os.getenv('TOKEN'))
