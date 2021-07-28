@@ -8,3 +8,4 @@ player.yml
 
 _pycache_/
 storage/playerDB
+logs/
