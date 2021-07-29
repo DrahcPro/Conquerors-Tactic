@@ -1,4 +1,4 @@
-import yaml
+import yaml, logging
 
 def pull(file,directory=""):
   with open(f'{directory}{file}.yml') as inputfile:

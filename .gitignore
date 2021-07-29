@@ -8,4 +8,5 @@ player.yml
 
 _pycache_/
 storage/playerDB
+storage/gameDB
 logs/
