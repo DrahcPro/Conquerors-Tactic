@@ -1,6 +1,6 @@
 info:
-  id: <id>
-  name: <name>
+  id: "<id>"
+  name: "<name>"
 stats:
   range: 1
   #attack range (in tiles) upgradeable

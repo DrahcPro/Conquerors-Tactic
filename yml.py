@@ -1,4 +1,3 @@
-#NEEDS REWRITING
 import yaml
 
 def pull(file,directory=""):
