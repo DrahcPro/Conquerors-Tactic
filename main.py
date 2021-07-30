@@ -10,6 +10,7 @@ from yml import pull, push
 import discord, asyncio
 import logging, os, datetime
 import random
+from supervision import embeding
 
 #Permanent variables
 testingChannel = 869998032324804618
@@ -50,9 +51,23 @@ async def on_ready():
       await asyncio.sleep(waitingTimeH * 60 * 60)
       token_loop.start()
       
-
-
-
+@client.event
+async def on_message(message):
+  if message.author.id != 869998264987045929:
+    if message.channel.id == testingChannel:
+      channel = client.get_channel(869942398229295124)
+      embed = embeding(message,'public')
+      if embed != None:
+       await channel.send(embed=embed)
+    elif isinstance(message.channel, discord.channel.DMChannel):
+      channel = client.get_channel(869942398229295124)
+      embed = embeding(message,'private')
+      if embed != None:
+        await channel.send(embed=embed)
+    else:
+      ...
+  await client.process_commands(message)
+  
 
 
 #Checking if the person in question has the right permissions/role
@@ -80,6 +95,8 @@ def permissions(ctx,level):
       return True #Has no Game player role
     else:
       return False
+  elif level == 'Channel':
+    return False
   else:
     logging.warning('Permission function used wrong, no or wrong level given')
     return 'Error'
@@ -93,6 +110,7 @@ async def ping(ctx, arg=""):
     await ctx.send("pong")
     if arg == "+":
         await ctx.send(f"measured: {client.latency}")
+
 
 
 #Create_user - add a user to the game
@@ -129,7 +147,20 @@ async def create_user(ctx, *, user: discord.User):
         newPlayer = ctx.guild.get_member(user.id)
         await newPlayer.add_roles(ctx.guild.get_role(869989618177691658))
 
-#Add token LOOP
+
+
+#Reset_user - resets a user's game stats
+@client.command() 
+async def reset_user(ctx,user=discord.User,*,args=""):
+  if permissions(ctx,'Game_admin'):
+    logging.info(f'Reset_user command registered but has wrong permissions, send by:{ctx.author.name}')
+    await ctx.send('You do not have the given permissions or are in the wrong channel')
+    return
+  logging.info(f'Reset_user command registered, send by: {ctx.author.name}; attacking {user.name}')
+
+
+
+#token_loop - loops every x time to add a token to all players
 @tasks.loop(hours=pull('gameSettings','storage/gameDB/')['player-income']['time-unit'])
 async def token_loop():
     logging.info('Adding 1 token to everybody')
@@ -151,7 +182,9 @@ async def token_loop():
     gameSettings['player-income']['latest-income'] = f'{h};{m}'
     push(gameSettings,'gameSettings','storage/gameDB/')
 
-#Start game 
+
+
+#Start_game - starts game and token loop 
 @client.command() 
 async def start_game(ctx,*,args=''):
   #Does the person have the right role and is in the right channel
@@ -231,7 +264,6 @@ async def start_game(ctx,*,args=''):
   
 
 
-
 @client.command()
 async def kill(ctx,user: discord.User,*,args=""):
   if permissions(ctx,'Player'):
@@ -245,6 +277,8 @@ async def kill(ctx,user: discord.User,*,args=""):
   #Remove life from target
   #Remove token(s)
   #Confirm success in reply or send error
+
+
 
 @client.command()
 async def move(ctx,x=0,y=0,*,args=""):
@@ -261,6 +295,8 @@ async def move(ctx,x=0,y=0,*,args=""):
   #Remove token(s)
   #Confirm success in reply or send error
 
+
+
 @client.command()
 async def range_upgrade(ctx,*,args=""):
   if permissions(ctx,'Player'):
@@ -274,7 +310,6 @@ async def range_upgrade(ctx,*,args=""):
   #Upgrade range
   #Remove token(s)
   #Confirm success in reply or send error
-
 
 
 
