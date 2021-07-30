@@ -17,10 +17,7 @@ testingChannel = 869998032324804618
 #Functional code------------------
 intents = discord.Intents().all()
 client = commands.Bot(command_prefix="n@", intents=intents)
-logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s',
-                    datefmt='%m/%d/%Y %H:%M:%S',
-                    filename='logs/info.log',
-                    level=logging.INFO)
+logging.basicConfig(format='%(asctime)s %(levelname)s %(message)s', datefmt='%m/%d/%Y %H:%M:%S', filename='logs/info.log', level=logging.INFO)
 
 
 #On_ready - everytime discord bot gets started
@@ -29,6 +26,64 @@ async def on_ready():
     channel = client.get_channel(testingChannel)
     await channel.send('We are online')
     logging.info('Bot is online')
+
+    gameSettings = pull('gameSettings','storage/gameDB/')
+    if gameSettings['game-state']['state'] == 'running':
+      now = datetime.datetime.now()
+      h = now.hour
+      m = now.minute
+      h = h + m / 60
+
+      target = gameSettings['player-income']['latest-income']
+      th = int(target[0:2]) + int(gameSettings['player-income']['time-unit'])
+      tm = int(target[3:5])
+      th = th + tm / 60
+
+      if th > h:
+        waitingTimeH = th - h
+      elif th < h:
+        waitingTimeH = (24 - h) + th
+      else:
+        waitingTimeH = 0
+
+      logging.info(f'Since game should be running, starting token loop again; waiting: {waitingTimeH}')
+      await asyncio.sleep(waitingTimeH * 60 * 60)
+      token_loop.start()
+      
+
+
+
+
+
+#Checking if the person in question has the right permissions/role
+def permissions(ctx,level):
+  #Check channel
+  if ctx.channel.id != testingChannel and not(isinstance(ctx.channel, discord.channel.DMChannel)):
+    logging.info('Wrong channel')
+    return True #Isn't in the right channel
+  #Check role
+  if level == 'Game_master':
+    if not (ctx.guild.get_role(869989536489414717) in ctx.author.roles): 
+      logging.info('No game master role')
+      return True #Has no Game master role
+    else:
+      return False
+  elif level == 'Game_admin':
+    if not (ctx.guild.get_role(870021534243250176) in ctx.author.roles): 
+      logging.info('No game admin role')
+      return True #Has no Game admin role
+    else:
+      return False
+  elif level == 'Player':
+    if not (ctx.guild.get_role(869989618177691658) in ctx.author.roles): 
+      logging.info('No game player role')
+      return True #Has no Game player role
+    else:
+      return False
+  else:
+    logging.warning('Permission function used wrong, no or wrong level given')
+    return 'Error'
+
 
 
 #Ping - to check for state of bot
@@ -44,12 +99,14 @@ async def ping(ctx, arg=""):
 @client.command()
 async def create_user(ctx, *, user: discord.User):
     #Checks if command may be used (Admin and in the right channel)
-    if ctx.channel != client.get_channel(testingChannel):
+    if permissions(ctx,'Game_admin'):
+      logging.info(f'Create_user command registered but has wrong permissions, send by: {ctx.author.name}')
+      await ctx.send('You do not have the given permissions or are in the wrong channel')
+      return
+    if user == None:
+        await ctx.send('No user given')
         return
-    if not (ctx.author.id == 285793122825404416
-            or ctx.author.id == 395201615298297858):
-        return
-    logging.info(f'Create_user command registered, send by: {ctx.author.name}')
+    logging.info(f'Create_user command registered, send by: {ctx.author.name}; creating user for {user.name}')
 
     #-Check if user already is a player
     players = pull('players', 'storage/playerDB/')
@@ -83,19 +140,34 @@ async def token_loop():
       data = pull(player,'storage/playerDB/players/')
       data['character']['tokens'] += 1
       push(data,player,'storage/playerDB/players/')
+    gameSettings = pull('gameSettings','storage/gameDB/')
+    now =  datetime.datetime.now()
+    h = str(now.hour)
+    m = str(now.minute)
+    if len(h) == 1:
+      h = f'0{h}'
+    if len(m) == 1:
+      m = f'0{m}'
+    gameSettings['player-income']['latest-income'] = f'{h};{m}'
+    push(gameSettings,'gameSettings','storage/gameDB/')
 
 #Start game 
 @client.command() 
 async def start_game(ctx,*,args=''):
-  #Is the user using the command a Game master?
-  if not (ctx.guild.get_role(869989536489414717) in ctx.author.roles): 
-    return #Game master role
+  #Does the person have the right role and is in the right channel
+  if permissions(ctx,'Game_master'):
+    logging.info(f'Start_game command registered but has wrong permissions, send by: {ctx.author.name}')
+    await ctx.send('You do not have the given permissions or are in the wrong channel')
+    return 
+
   #Is the game already running?
   gameSettings = pull('gameSettings', 'storage/gameDB/')
   if gameSettings['game-state']['state'] != 'stopped':
     await ctx.send('Game is already running')
     return
   logging.info(f'Start_game command registered, send by: {ctx.author.name}; and starting game')
+  await ctx.send('Starting game')
+
   #Give all players a random position
   players = pull('players','storage/playerDB/')
   usedCoords = []
@@ -151,9 +223,59 @@ async def start_game(ctx,*,args=''):
     waitingTimeH = 0
   #Starting loop
   logging.info(f'starting token loop; waiting time: {waitingTimeH}')
+
+  await ctx.send('Game started')
+  logging.info('GAME STARTED')
   await asyncio.sleep(waitingTimeH*60*60)
   token_loop.start()
-  await ctx.send('Game started')
+  
+
+
+
+@client.command()
+async def kill(ctx,user: discord.User,*,args=""):
+  if permissions(ctx,'Player'):
+    logging.info(f'Kill command registered but has wrong permissions, send by: {ctx.author.name}')
+    return
+  logging.info(f'Kill command registered, send by: {ctx.author.name}; attacking {user.name}')
+  ...
+  #Check if author is an ALIVE player
+  #Check if target is an ALIVE player
+  #Check if author has enough tokens
+  #Remove life from target
+  #Remove token(s)
+  #Confirm success in reply or send error
+
+@client.command()
+async def move(ctx,x=0,y=0,*,args=""):
+  if permissions(ctx,'Player'):
+    logging.info(f'Move command registered but has wrong permissions, send by: {ctx.author.name}')
+    return
+  logging.info(f'Move command registered, send by: {ctx.author.name}; moving {x} sideways and {y} vertically')
+  ...
+  #Check if author is an ALIVE player
+  #Check if author has enough tokens
+  #Check if the movement is a valid movement (not out of boundaries)
+  #Check if x and y arent both 0
+  #Move player
+  #Remove token(s)
+  #Confirm success in reply or send error
+
+@client.command()
+async def range_upgrade(ctx,*,args=""):
+  if permissions(ctx,'Player'):
+    logging.info(f'Range_upgrade command registered but has wrong permissions, send by: {ctx.author.name}')
+    return
+  logging.info(f'Range_upgrade command registered, send by: {ctx.author.name}')
+  ...
+  #Check if author is an ALIVE player
+  #Check if author has enough tokens
+  #Check current range
+  #Upgrade range
+  #Remove token(s)
+  #Confirm success in reply or send error
+
+
 
 
 #Starting the bot
