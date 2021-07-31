@@ -270,13 +270,46 @@ async def kill(ctx,user: discord.User,*,args=""):
     logging.info(f'Kill command registered but has wrong permissions, send by: {ctx.author.name}')
     return
   logging.info(f'Kill command registered, send by: {ctx.author.name}; attacking {user.name}')
-  ...
+  
+  players = pull('players','storage/playerDB/')
   #Check if author is an ALIVE player
   #Check if target is an ALIVE player
-  #Check if author has enough tokens
-  #Remove life from target
-  #Remove token(s)
-  #Confirm success in reply or send error
+  if players[ctx.author.id] != 1:
+    logging.info(f'Author is not an alive player')
+    await ctx.send("You are not an alive player, you can't use this command.")
+  elif players[user.id] != 1:
+    logging.info(f'Target is not an alive player')
+    await ctx.send("You can't kill a player who is dead.")
+  else:
+    #STILL NEEDED - CHECK IF SHOOTER IS IN RANGE
+    #Check if author has enough tokens
+    gameSettings = pull('gameSettings', 'storage/gameDB/')
+    playerData = pull(ctx.author.id, 'storage/playerDB/players/')
+    if playerData['character']['tokens'] >= gameSettings['prices']['shooting']:
+      #Remove life from target
+      #Remove token(s)
+      targetData = pull(user.id, 'storage/playerDB/players/')
+      targetData['character']['lives'] -= 1
+      lives = targetData['character']['lives']
+      logging.info(f'new no. of lives: {str(lives)}')
+      push(targetData, user.id, 'storage/playerDB/players/')
+      test = pull(user.id, 'storage/playerDB/players/')
+      newLives = test['character']['lives']
+      logging.info(f'{newLives}')
+      logging.info(f'Hit carried out')
+      await ctx.send("Shot fired against " + user.name)
+
+      if (targetData['character']['lives'] <= 0):
+        players[user.id] = 0
+        push(players, 'players','storage/playerDB/')
+        logging.info(f'Target dead.')
+        await ctx.send(user.name + " ran out of lives! They are out of the game!")
+      
+      playerData['character']['tokens'] -= gameSettings['prices']['shooting']
+      push(playerData, ctx.author.id, 'storage/playerDB/players/')
+    else:
+      logging.info(f'Author does not have enough tokens')
+      await ctx.send("You don't have enough tokens!")
 
 
 
