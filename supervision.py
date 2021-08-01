@@ -35,22 +35,23 @@ def embeding(message,mode):
   if mode == 'private':
     if message.content.startswith('n@'):
       command = commandfinder(message.content)
-      embed=discord.Embed(title="DM",description=f'Command: **{command[0]}**',colour=colourwheel(command[0]))
+      embed=discord.Embed(title=f'{command[0]}',description="Direct Message",colour=colourwheel(command[0]))
       embed.set_author(name=message.author.name,icon_url=message.author.avatar_url)
       for k in range(0,len(command)-1):
-        embed.add_field(name=f'variable {k+1}',value=command[k+1])
+        embed.add_field(name=f'variable {k+1}:',value=command[k+1])
     else:
-      embed=discord.Embed(title="DM",description=message.content)
+      embed=discord.Embed(title="Message",description='Direct Message')
       embed.set_author(name=message.author.name,icon_url=message.author.avatar_url)
+      embed.add_field(name='Message:',value=message.content)
 
     return embed
   elif mode == 'public':
     if message.content.startswith('n@'):
       command = commandfinder(message.content)
-      embed=discord.Embed(title=message.channel.name,url=message.jump_url,description=f'Command: **{command[0]}**',colour=colourwheel(command[0]))
+      embed=discord.Embed(title=f'{command[0]}',url=message.jump_url,description=message.channel.name,colour=colourwheel(command[0]))
       embed.set_author(name=message.author.name,icon_url=message.author.avatar_url)
       for k in range(0,len(command)-1):
-        embed.add_field(name=f'variable {k+1}',value=command[k+1])
+        embed.add_field(name=f'variable {k+1}:',value=command[k+1])
     else:
       return None
 

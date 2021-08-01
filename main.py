@@ -72,25 +72,27 @@ async def on_message(message):
 
 #Checking if the person in question has the right permissions/role
 def permissions(ctx,level):
+  guild = client.get_guild(869931454237397103)
+  member = guild.get_member(ctx.author.id)
   #Check channel
   if ctx.channel.id != testingChannel and not(isinstance(ctx.channel, discord.channel.DMChannel)):
     logging.info('Wrong channel')
     return True #Isn't in the right channel
   #Check role
   if level == 'Game_master':
-    if not (ctx.guild.get_role(869989536489414717) in ctx.author.roles): 
+    if not (guild.get_role(869989536489414717) in member.roles): 
       logging.info('No game master role')
       return True #Has no Game master role
     else:
       return False
   elif level == 'Game_admin':
-    if not (ctx.guild.get_role(870021534243250176) in ctx.author.roles): 
+    if not (guild.get_role(870021534243250176) in member.roles): 
       logging.info('No game admin role')
       return True #Has no Game admin role
     else:
       return False
   elif level == 'Player':
-    if not (ctx.guild.get_role(869989618177691658) in ctx.author.roles): 
+    if not (guild.get_role(869989618177691658) in member.roles): 
       logging.info('No game player role')
       return True #Has no Game player role
     else:
@@ -222,8 +224,8 @@ async def start_game(ctx,*,args=''):
         logging.info(f'invalid coordinate: {coord}')
       
     data = pull(i, 'storage/playerDB/players/')
-    data['x-location'] = x
-    data['y-location'] = y
+    data['gameinfo']['x-location'] = x
+    data['gameinfo']['y-location'] = y
     push(data, i, 'storage/playerDB/players/')
 
 
@@ -272,44 +274,66 @@ async def kill(ctx,user: discord.User,*,args=""):
   logging.info(f'Kill command registered, send by: {ctx.author.name}; attacking {user.name}')
   
   players = pull('players','storage/playerDB/')
+  #Check if game is running
+  gameSettings = pull('gameSettings', 'storage/gameDB/')
+  if gameSettings['game-state']['state'] != 'running':
+    logging.info(f'Game is not running, command cannot be executed')
+    await ctx.send("The game needs to be running for you to use this command!")
+    return
+  #Check if player is trying to shoot themselves
+  if ctx.author.id == user.id:
+    logging.info(f'Author is trying to shoot themselves')
+    await ctx.send("You can't shoot yourself.")
   #Check if author is an ALIVE player
-  #Check if target is an ALIVE player
-  if players[ctx.author.id] != 1:
+  elif players[ctx.author.id] != 1:
     logging.info(f'Author is not an alive player')
     await ctx.send("You are not an alive player, you can't use this command.")
+  #Check if target is an ALIVE player
   elif players[user.id] != 1:
     logging.info(f'Target is not an alive player')
     await ctx.send("You can't kill a player who is dead.")
   else:
-    #STILL NEEDED - CHECK IF SHOOTER IS IN RANGE
-    #Check if author has enough tokens
-    gameSettings = pull('gameSettings', 'storage/gameDB/')
+    #Check if target is in range
     playerData = pull(ctx.author.id, 'storage/playerDB/players/')
-    if playerData['character']['tokens'] >= gameSettings['prices']['shooting']:
-      #Remove life from target
-      #Remove token(s)
-      targetData = pull(user.id, 'storage/playerDB/players/')
-      targetData['character']['lives'] -= 1
-      lives = targetData['character']['lives']
-      logging.info(f'new no. of lives: {str(lives)}')
-      push(targetData, user.id, 'storage/playerDB/players/')
-      test = pull(user.id, 'storage/playerDB/players/')
-      newLives = test['character']['lives']
-      logging.info(f'{newLives}')
-      logging.info(f'Hit carried out')
-      await ctx.send("Shot fired against " + user.name)
+    targetData = pull(user.id, 'storage/playerDB/players/')
+    playerCoords = [playerData['gameinfo']['x-location'], playerData['gameinfo']['y-location']]
+    targetCoords = [targetData['gameinfo']['x-location'], targetData['gameinfo']['y-location']]
 
-      if (targetData['character']['lives'] <= 0):
-        players[user.id] = 0
-        push(players, 'players','storage/playerDB/')
-        logging.info(f'Target dead.')
-        await ctx.send(user.name + " ran out of lives! They are out of the game!")
+    xDifference = targetCoords[0] - playerCoords[0]
+    yDifference = targetCoords[1] - playerCoords[1]
+    shooterRange = playerData['stats']['range']
+    if (-shooterRange <= xDifference <= shooterRange) and (-shooterRange <= yDifference <= shooterRange):
+      if playerData['character']['tokens'] >= gameSettings['prices']['shooting']:
+        #Remove life from target
+        targetData['character']['lives'] -= 1
+        lives = targetData['character']['lives']
+        logging.info(f'new no. of lives: {str(lives)}')
+        push(targetData, user.id, 'storage/playerDB/players/')
+        test = pull(user.id, 'storage/playerDB/players/')
+        newLives = test['character']['lives']
+        logging.info(f'{newLives}')
+        logging.info(f'Hit carried out')
+        await ctx.send("Shot fired against " + user.name)
+
+        #Check if the target is now dead
+        if (targetData['character']['lives'] <= 0):
+          players[user.id] = 0
+          push(players, 'players','storage/playerDB/')
+          logging.info(f'Target dead.')
+          channel = client.get_channel(testingChannel)
+          await channel.send(f"<@{user.id}> ran out of lives! They are out of the game!")
       
-      playerData['character']['tokens'] -= gameSettings['prices']['shooting']
-      push(playerData, ctx.author.id, 'storage/playerDB/players/')
+        #Remove token(s)
+        playerData['character']['tokens'] -= gameSettings['prices']['shooting']
+        push(playerData, ctx.author.id, 'storage/playerDB/players/')
+      else:
+        logging.info(f'Author does not have enough tokens')
+        await ctx.send("You don't have enough tokens!")
     else:
-      logging.info(f'Author does not have enough tokens')
-      await ctx.send("You don't have enough tokens!")
+      logging.info(f'Player not in range')
+      await ctx.send("That player is not in range!")
+
+
 
 
 
@@ -318,12 +342,13 @@ async def move(ctx,x=0,y=0,*,args=""):
   if permissions(ctx,'Player'):
     logging.info(f'Move command registered but has wrong permissions, send by: {ctx.author.name}')
     return
-  logging.info(f'Move command registered, send by: {ctx.author.name}; moving {x} sideways and {y} vertically')
   ...
+  #Check if the game is running
   #Check if author is an ALIVE player
   #Check if author has enough tokens
-  #Check if the movement is a valid movement (not out of boundaries)
   #Check if x and y arent both 0
+  #Check if the movement is a valid movement (not out of boundaries)
+  logging.info(f'Move command registered, send by: {ctx.author.name}; moving {x} sideways and {y} vertically')
   #Move player
   #Remove token(s)
   #Confirm success in reply or send error
@@ -337,6 +362,7 @@ async def range_upgrade(ctx,*,args=""):
     return
   logging.info(f'Range_upgrade command registered, send by: {ctx.author.name}')
   ...
+  #Check if the game is running
   #Check if author is an ALIVE player
   #Check if author has enough tokens
   #Check current range
@@ -344,6 +370,22 @@ async def range_upgrade(ctx,*,args=""):
   #Remove token(s)
   #Confirm success in reply or send error
 
+
+
+@client.command()
+async def transfer_tokens(ctx,user:discord.User,amount,*,args=""):
+  if permissions(ctx,'Player'):
+    logging.info(f'Range_upgrade command registered but has wrong permissions, send by: {ctx.author.name}')
+    return
+  logging.info(f'Transfer_token command registered, send by: {ctx.author.name} to {user.name}; amount: {amount}')
+  #Check if the game is running
+  #Check if author is an ALIVE player
+  #Check if target is an ALIVE player
+  #Check if amount > 0
+  #Remove tokens from author
+  #Add tokens to target
+
+  ...
 
 
 #Starting the bot
