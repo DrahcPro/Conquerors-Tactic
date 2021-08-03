@@ -198,7 +198,7 @@ async def start_game(ctx,*,args=''):
   #Is the game already running?
   gameSettings = pull('gameSettings', 'storage/gameDB/')
   if gameSettings['game-state']['state'] != 'stopped':
-    await ctx.send('Game is already running')
+    await ctx.send('Game is already running or paused')
     return
   logging.info(f'Start_game command registered, send by: {ctx.author.name}; and starting game')
   await ctx.send('Starting game')
@@ -266,6 +266,124 @@ async def start_game(ctx,*,args=''):
   
 
 
+@client.command() 
+async def stop_game(ctx,*,args=''):
+  #Does the person have the right role and is in the right channel
+  if permissions(ctx,'Game_master'):
+    logging.info(f'Stop_game command registered but has wrong permissions, send by: {ctx.author.name}')
+    await ctx.send('You do not have the given permissions or are in the wrong channel')
+    return 
+
+  #Is the game already running?
+  gameSettings = pull('gameSettings', 'storage/gameDB/')
+  if gameSettings['game-state']['state'] == 'stopped':
+    await ctx.send('Game is not running')
+    return
+  logging.info(f'Stop_game command registered, send by: {ctx.author.name}; and stopping game')
+  await ctx.send('Stopping game')
+
+  #Stop the token loop if running
+  try:
+    token_loop.cancel()
+  except:
+    ...
+  #Change game state
+  logging.info('changing game state')
+  gameSettings['game-state']['state'] = 'stopped'
+  push(gameSettings,'gameSettings','storage/gameDB/')
+
+  #@everyone that the game has been finalised and stopped
+
+  logging.info('GAME STOPPED')
+
+
+
+@client.command() 
+async def pause_game(ctx,*,args=''):
+  #Does the person have the right role and is in the right channel
+  if permissions(ctx,'Game_master'):
+    logging.info(f'Pause_game command registered but has wrong permissions, send by: {ctx.author.name}')
+    await ctx.send('You do not have the given permissions or are in the wrong channel')
+    return 
+
+  #Is the game already running?
+  gameSettings = pull('gameSettings', 'storage/gameDB/')
+  if gameSettings['game-state']['state'] != 'running':
+    await ctx.send('Game is not running or paused')
+    return
+  logging.info(f'Pause_game command registered, send by: {ctx.author.name}; and pausing game')
+  await ctx.send('Pausing game')
+
+  #Stop the token loop if running
+  try:
+    token_loop.cancel()
+  except:
+    ...
+
+  #Change game state
+  logging.info('changing game state')
+  gameSettings['game-state']['state'] = 'paused'
+  push(gameSettings,'gameSettings','storage/gameDB/')
+
+  #@everyone that the game has been paused
+
+  logging.info('GAME PAUSED')
+
+
+
+@client.command() 
+async def unpause_game(ctx,*,args=''):
+  #Does the person have the right role and is in the right channel
+  if permissions(ctx,'Game_master'):
+    logging.info(f'Unpause_game command registered but has wrong permissions, send by: {ctx.author.name}')
+    await ctx.send('You do not have the given permissions or are in the wrong channel')
+    return 
+
+  #Is the game already running?
+  gameSettings = pull('gameSettings', 'storage/gameDB/')
+  if gameSettings['game-state']['state'] != 'paused':
+    await ctx.send('Game is not paused')
+    return
+  logging.info(f'Unpause_game command registered, send by: {ctx.author.name}; and pausing game')
+  await ctx.send('Unpausing game')
+
+  #Start the token loop again
+  now = datetime.datetime.now()
+  h = now.hour
+  m = now.minute
+  h = h + m / 60
+
+  target = gameSettings['player-income']['latest-income']
+  th = int(target[0:2]) + int(gameSettings['player-income']['time-unit'])
+  tm = int(target[3:5])
+  th = th + tm / 60
+
+  if th > h:
+    waitingTimeH = th - h
+  elif th < h:
+    waitingTimeH = (24 - h) + th
+  else:
+    waitingTimeH = 0
+
+  #NOT WORKING YET, NEEDS FIXING!!!!!!!!!!!!!!!!!!!!!
+  #
+  #
+  #
+  logging.info(f'Since the game is unpaused, starting token loop again; waiting: {waitingTimeH}')
+  await asyncio.sleep(waitingTimeH * 60 * 60)
+  token_loop.start()
+
+  #Change game state
+  logging.info('changing game state')
+  gameSettings['game-state']['state'] = 'running'
+  push(gameSettings,'gameSettings','storage/gameDB/')
+
+  #@everyone that the game has been unpaused
+
+  logging.info('GAME UNPAUSED')
+
+
+
 @client.command()
 async def kill(ctx,user: discord.User,*,args=""):
   if permissions(ctx,'Player'):
@@ -309,12 +427,9 @@ async def kill(ctx,user: discord.User,*,args=""):
         lives = targetData['character']['lives']
         logging.info(f'new no. of lives: {str(lives)}')
         push(targetData, user.id, 'storage/playerDB/players/')
-        test = pull(user.id, 'storage/playerDB/players/')
-        newLives = test['character']['lives']
-        logging.info(f'{newLives}')
         logging.info(f'Hit carried out')
         await ctx.send("Shot fired against " + user.name)
-
+        await user.send(ctx.author.name + " fired a shot against you! You now have " + str(lives) + " lives remaining.")
         #Check if the target is now dead
         if (targetData['character']['lives'] <= 0):
           players[user.id] = 0
@@ -335,24 +450,60 @@ async def kill(ctx,user: discord.User,*,args=""):
 
 
 
+@client.command() 
+async def game_state(ctx,*,args=""):
+  gameSettings = pull('gameSettings', 'storage/gameDB/')
+  await ctx.send(gameSettings['game-state']['state'])
+
 
 
 @client.command()
 async def move(ctx,x=0,y=0,*,args=""):
+  logging.info(f'Move command registered, send by: {ctx.author.name}; moving {x} sideways and {y} vertically')
   if permissions(ctx,'Player'):
     logging.info(f'Move command registered but has wrong permissions, send by: {ctx.author.name}')
     return
   ...
   #Check if the game is running
+  gameSettings = pull('gameSettings', 'storage/gameDB/')
+  if gameSettings['game-state']['state'] != 'running':
+    logging.info(f'Game is not running, command cannot be executed')
+    await ctx.send("The game needs to be running for you to use this command!")
+    return
   #Check if author is an ALIVE player
+  players = pull('players','storage/playerDB/')
+  if players[ctx.author.id] != 1:
+    logging.info(f'Author is not an alive player')
+    await ctx.send("You are not an alive player, you can't use this command.")
+    return
   #Check if author has enough tokens
+  playerData = pull(ctx.author.id, 'storage/playerDB/players/')
+  if playerData['character']['tokens'] < gameSettings['prices']['moving']:
+    logging.info(f'Author does not have enough tokens')
+    await ctx.send("You don't have enough tokens!")
+    return
   #Check if x and y arent both 0
+  if x == 0 and y == 0:
+    logging.info(f'User tried to move zero spaces')
+    await ctx.send("You can't move zero spaces!")
+    return
   #Check if the movement is a valid movement (not out of boundaries)
-  logging.info(f'Move command registered, send by: {ctx.author.name}; moving {x} sideways and {y} vertically')
+  if x < -1 or x > 1:
+    logging.info(f'X movement out of boundaries')
+    await ctx.send("You can only move one space!")
+    return
+  elif y < -1 or y > 1:
+    logging.info(f'X movement out of boundaries')
+    await ctx.send("You can only move one space!")
+    return
   #Move player
+  playerData['gameinfo']['x-location'] += x
+  playerData['gameinfo']['y-location'] += y
   #Remove token(s)
-  #Confirm success in reply or send error
-
+  playerData['character']['tokens'] -= 1
+  push(playerData, ctx.author.id, 'storage/playerDB/players/')
+  logging.info(f'Move carried out successfully.')
+  await ctx.send("You moved (" + str(x) + ", " + str(y) + ")! You are now at position (" + str(playerData['gameinfo']['x-location']) + ", " + str(playerData['gameinfo']['y-location']) + ")")
 
 
 @client.command()
@@ -386,6 +537,7 @@ async def transfer_tokens(ctx,user:discord.User,amount,*,args=""):
   #Add tokens to target
 
   ...
+
 
 
 #Starting the bot
