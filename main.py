@@ -456,14 +456,21 @@ async def game_state(ctx,*,args=""):
   await ctx.send(gameSettings['game-state']['state'])
 
 
-
 @client.command()
-async def move(ctx,x=0,y=0,*,args=""):
+async def move(ctx,x,y,*,args=""):
   if permissions(ctx,'Player'):
     logging.info(f'Move command registered but has wrong permissions, send by: {ctx.author.name}')
     return
   logging.info(f'Move command registered, send by: {ctx.author.name}; moving {x} sideways and {y} vertically')
-  ...
+
+  try:
+    x = int(x)
+    y = int(y)
+  except:
+    logging.info(f'Inputs not in integer form')
+    await ctx.send("Your inputs need to be integers!")
+    return
+  
   #Check if the game is running
   gameSettings = pull('gameSettings', 'storage/gameDB/')
   if gameSettings['game-state']['state'] != 'running':
@@ -547,15 +554,48 @@ async def transfer_tokens(ctx,user:discord.User,amount,*,args=""):
     logging.info(f'Range_upgrade command registered but has wrong permissions, send by: {ctx.author.name}')
     return
   logging.info(f'Transfer_token command registered, send by: {ctx.author.name} to {user.name}; amount: {amount}')
+
+  try:
+    amount = int(amount)
+  except:
+    logging.info(f'Amount given not an integer')
+    await ctx.send("Your input needs to be an integer!")
+    return
+
   #Check if the game is running
+  gameSettings = pull('gameSettings', 'storage/gameDB/')
+  if gameSettings['game-state']['state'] != 'running':
+    logging.info(f'Game is not running, command cannot be executed')
+    await ctx.send("The game needs to be running for you to use this command!")
+    return
   #Check if author is an ALIVE player
+  players = pull('players','storage/playerDB/')
+  if players[ctx.author.id] != 1:
+    logging.info(f'Author is not an alive player')
+    await ctx.send("You are not an alive player, you can't use this command.")
+    return
   #Check if target is an ALIVE player
-  #Check if amount > 0
+  players = pull('players','storage/playerDB/')
+  if players[user.id] != 1:
+    logging.info(f'Target is not an alive player')
+    await ctx.send("You can't give tokens to a player who isn't alive.")
+    return
+  #Check if player has enough tokens
+  playerData = pull(ctx.author.id, 'storage/playerDB/players/')
+  if playerData['character']['tokens'] < amount:
+    logging.info(f'Author does not have enough tokens')
+    await ctx.send("You don't have that many tokens!")
+    return
   #Remove tokens from author
+  playerData['character']['tokens'] -= amount
+  push(playerData, ctx.author.id, 'storage/playerDB/players/')
   #Add tokens to target
-
-  ...
-
+  targetData = pull(user.id, 'storage/playerDB/players/')
+  targetData['character']['tokens'] += amount
+  push(targetData, user.id, 'storage/playerDB/players/')
+  logging.info(f'Token transfer carried out successfully')
+  await ctx.send("You transferred " + str(amount) + " tokens to " + user.name)
+  await user.send(ctx.author.name + " transferred " + str(amount) + " tokens to you! You now have " + str(targetData['character']['tokens']) + "!")
 
 
 #Starting the bot
