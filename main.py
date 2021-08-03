@@ -459,10 +459,10 @@ async def game_state(ctx,*,args=""):
 
 @client.command()
 async def move(ctx,x=0,y=0,*,args=""):
-  logging.info(f'Move command registered, send by: {ctx.author.name}; moving {x} sideways and {y} vertically')
   if permissions(ctx,'Player'):
     logging.info(f'Move command registered but has wrong permissions, send by: {ctx.author.name}')
     return
+  logging.info(f'Move command registered, send by: {ctx.author.name}; moving {x} sideways and {y} vertically')
   ...
   #Check if the game is running
   gameSettings = pull('gameSettings', 'storage/gameDB/')
@@ -500,7 +500,7 @@ async def move(ctx,x=0,y=0,*,args=""):
   playerData['gameinfo']['x-location'] += x
   playerData['gameinfo']['y-location'] += y
   #Remove token(s)
-  playerData['character']['tokens'] -= 1
+  playerData['character']['tokens'] -= gameSettings['prices']['moving']
   push(playerData, ctx.author.id, 'storage/playerDB/players/')
   logging.info(f'Move carried out successfully.')
   await ctx.send("You moved (" + str(x) + ", " + str(y) + ")! You are now at position (" + str(playerData['gameinfo']['x-location']) + ", " + str(playerData['gameinfo']['y-location']) + ")")
@@ -514,13 +514,31 @@ async def range_upgrade(ctx,*,args=""):
   logging.info(f'Range_upgrade command registered, send by: {ctx.author.name}')
   ...
   #Check if the game is running
+  gameSettings = pull('gameSettings', 'storage/gameDB/')
+  if gameSettings['game-state']['state'] != 'running':
+    logging.info(f'Game is not running, command cannot be executed')
+    await ctx.send("The game needs to be running for you to use this command!")
+    return
   #Check if author is an ALIVE player
+  players = pull('players','storage/playerDB/')
+  if players[ctx.author.id] != 1:
+    logging.info(f'Author is not an alive player')
+    await ctx.send("You are not an alive player, you can't use this command.")
+    return
   #Check if author has enough tokens
+  playerData = pull(ctx.author.id, 'storage/playerDB/players/')
+  if playerData['character']['tokens'] < gameSettings['prices']['range-upgrade']:
+    logging.info(f'Author does not have enough tokens')
+    await ctx.send("You don't have enough tokens!")
+    return
   #Check current range
   #Upgrade range
+  playerData['stats']['range'] += 1
   #Remove token(s)
-  #Confirm success in reply or send error
-
+  playerData['character']['tokens'] -= gameSettings['prices']['range-upgrade']
+  push(playerData, ctx.author.id, 'storage/playerDB/players/')
+  logging.info(f'Range upgrade carried out successfully')
+  await ctx.send("You upgraded your range! It is now " + str(playerData['stats']['range']) + " spaces.")
 
 
 @client.command()
