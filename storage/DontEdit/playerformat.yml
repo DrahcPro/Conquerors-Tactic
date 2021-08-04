@@ -7,7 +7,7 @@ stats:
 character:
   lives: 3
   #out of 3, can't be bought extra
-  tokens: 1
+  tokens: 3
   #spending power
 gameinfo:
   x-location: 0

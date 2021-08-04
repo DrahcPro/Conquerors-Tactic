@@ -13,7 +13,8 @@ import random
 from supervision import embeding
 
 #Permanent variables
-testingChannel = 869998032324804618
+testingChannel = 869932614423830588
+announcementChannel = 869932484308131850
 
 #Functional code------------------
 intents = discord.Intents().all()
@@ -28,6 +29,10 @@ async def on_ready():
     await channel.send('We are online')
     logging.info('Bot is online')
 
+    logging.info('Drawing map')
+    #########################
+    await map_update()
+
     gameSettings = pull('gameSettings','storage/gameDB/')
     if gameSettings['game-state']['state'] == 'running':
       now = datetime.datetime.now()
@@ -36,8 +41,8 @@ async def on_ready():
       h = h + m / 60
 
       target = gameSettings['player-income']['latest-income']
-      th = int(target[0:2]) + int(gameSettings['player-income']['time-unit'])
-      tm = int(target[3:5])
+      th = float(target[0:2]) + float(gameSettings['player-income']['time-unit'])
+      tm = float(target[3:5])
       th = th + tm / 60
 
       if th > h:
@@ -47,10 +52,14 @@ async def on_ready():
       else:
         waitingTimeH = 0
 
+      logging.warning(f'{now.hour}:{now.minute} {h};  target: {target}; {th}')
       logging.info(f'Since game should be running, starting token loop again; waiting: {waitingTimeH}')
       await asyncio.sleep(waitingTimeH * 60 * 60)
       token_loop.start()
-      
+
+    
+
+
 @client.event
 async def on_message(message):
   if message.author.id != 869998264987045929:
@@ -158,7 +167,9 @@ async def reset_user(ctx,user=discord.User,*,args=""):
     logging.info(f'Reset_user command registered but has wrong permissions, send by:{ctx.author.name}')
     await ctx.send('You do not have the given permissions or are in the wrong channel')
     return
-  logging.info(f'Reset_user command registered, send by: {ctx.author.name}; attacking {user.name}')
+  logging.info(f'Reset_user command registered, send by: {ctx.author.name}; reseting {user.name}')
+
+  ...
 
 
 
@@ -214,8 +225,8 @@ async def start_game(ctx,*,args=''):
     x = 0
     y = 0
     while valid == False:
-      x = random.randint(0, gameSettings['map']['size-x'])
-      y = random.randint(0, gameSettings['map']['size-y'])
+      x = random.randint(1, gameSettings['map']['size-x'])
+      y = random.randint(1, gameSettings['map']['size-y'])
       coord = [x, y]
       if coord not in usedCoords:
         usedCoords.append(coord)
@@ -230,7 +241,25 @@ async def start_game(ctx,*,args=''):
 
 
   #@everyone with link and small text
+  channel = client.get_channel(announcementChannel)
+  message = """
+  -------------
+  @everyone, **the game has begun**!
+  Get together, form groups and start planning
+  Have fun, and good luck!
+  ||For more info check <#869932458823524452>||
+  """
+  await channel.send(message)
+
   #DM's with location and notifying they are an active player
+  players = pull('players','storage/playerDB/')
+  for i in players.keys():
+    if i == 0:
+      continue
+    player = client.get_user(i)
+    await player.send("""
+    The conqueror tactic's game has started!\nYou are a player in the game,\ngood luck and have fun!""")
+    
 
 
   #Change game state
@@ -260,6 +289,10 @@ async def start_game(ctx,*,args=''):
   logging.info(f'starting token loop; waiting time: {waitingTimeH}')
 
   await ctx.send('Game started')
+
+  #########################
+  await map_update()
+
   logging.info('GAME STARTED')
   await asyncio.sleep(waitingTimeH*60*60)
   token_loop.start()
@@ -293,6 +326,16 @@ async def stop_game(ctx,*,args=''):
   push(gameSettings,'gameSettings','storage/gameDB/')
 
   #@everyone that the game has been finalised and stopped
+  channel = client.get_channel(announcementChannel)
+  message = """
+  -------------
+  @everyone, **the game has finished**!
+  Congrats to the winner, and we hope to see everyone back for another game!
+  """
+  await channel.send(message)
+
+  #########################
+  await map_update()
 
   logging.info('GAME STOPPED')
 
@@ -326,6 +369,16 @@ async def pause_game(ctx,*,args=''):
   push(gameSettings,'gameSettings','storage/gameDB/')
 
   #@everyone that the game has been paused
+  channel = client.get_channel(announcementChannel)
+  message = """
+  -------------
+  **The game has been paused**!
+  The game will start soon again.
+  """
+  await channel.send(message)
+
+  #########################
+  await map_update()
 
   logging.info('GAME PAUSED')
 
@@ -346,6 +399,23 @@ async def unpause_game(ctx,*,args=''):
     return
   logging.info(f'Unpause_game command registered, send by: {ctx.author.name}; and pausing game')
   await ctx.send('Unpausing game')
+
+  #Change game state
+  logging.info('changing game state')
+  gameSettings['game-state']['state'] = 'running'
+  push(gameSettings,'gameSettings','storage/gameDB/')
+
+  #@everyone that the game has been unpaused
+  channel = client.get_channel(announcementChannel)
+  message = """
+  -------------
+  **The game has been unpaused**!
+  Have fun playing again.
+  """
+  await channel.send(message)
+  
+  #########################
+  await map_update()
 
   #Start the token loop again
   now = datetime.datetime.now()
@@ -372,13 +442,6 @@ async def unpause_game(ctx,*,args=''):
   logging.info(f'Since the game is unpaused, starting token loop again; waiting: {waitingTimeH}')
   await asyncio.sleep(waitingTimeH * 60 * 60)
   token_loop.start()
-
-  #Change game state
-  logging.info('changing game state')
-  gameSettings['game-state']['state'] = 'running'
-  push(gameSettings,'gameSettings','storage/gameDB/')
-
-  #@everyone that the game has been unpaused
 
   logging.info('GAME UNPAUSED')
 
@@ -441,6 +504,8 @@ async def kill(ctx,user: discord.User,*,args=""):
         #Remove token(s)
         playerData['character']['tokens'] -= gameSettings['prices']['shooting']
         push(playerData, ctx.author.id, 'storage/playerDB/players/')
+        #########################
+        await map_update()
       else:
         logging.info(f'Author does not have enough tokens')
         await ctx.send("You don't have enough tokens!")
@@ -450,14 +515,8 @@ async def kill(ctx,user: discord.User,*,args=""):
 
 
 
-@client.command() 
-async def game_state(ctx,*,args=""):
-  gameSettings = pull('gameSettings', 'storage/gameDB/')
-  await ctx.send(gameSettings['game-state']['state'])
-
-
 @client.command()
-async def move(ctx,x,y,*,args=""):
+async def move(ctx,x='-',y='-',*,args=""):
   if permissions(ctx,'Player'):
     logging.info(f'Move command registered but has wrong permissions, send by: {ctx.author.name}')
     return
@@ -511,6 +570,8 @@ async def move(ctx,x,y,*,args=""):
   push(playerData, ctx.author.id, 'storage/playerDB/players/')
   logging.info(f'Move carried out successfully.')
   await ctx.send("You moved (" + str(x) + ", " + str(y) + ")! You are now at position (" + str(playerData['gameinfo']['x-location']) + ", " + str(playerData['gameinfo']['y-location']) + ")")
+  #########################
+  await map_update()
 
 
 @client.command()
@@ -519,7 +580,7 @@ async def range_upgrade(ctx,*,args=""):
     logging.info(f'Range_upgrade command registered but has wrong permissions, send by: {ctx.author.name}')
     return
   logging.info(f'Range_upgrade command registered, send by: {ctx.author.name}')
-  ...
+
   #Check if the game is running
   gameSettings = pull('gameSettings', 'storage/gameDB/')
   if gameSettings['game-state']['state'] != 'running':
@@ -546,6 +607,7 @@ async def range_upgrade(ctx,*,args=""):
   push(playerData, ctx.author.id, 'storage/playerDB/players/')
   logging.info(f'Range upgrade carried out successfully')
   await ctx.send("You upgraded your range! It is now " + str(playerData['stats']['range']) + " spaces.")
+
 
 
 @client.command()
@@ -596,6 +658,87 @@ async def transfer_tokens(ctx,user:discord.User,amount,*,args=""):
   logging.info(f'Token transfer carried out successfully')
   await ctx.send("You transferred " + str(amount) + " tokens to " + user.name)
   await user.send(ctx.author.name + " transferred " + str(amount) + " tokens to you! You now have " + str(targetData['character']['tokens']) + "!")
+
+
+
+@client.command() 
+async def game_state(ctx,*,args=""):
+  gameSettings = pull('gameSettings', 'storage/gameDB/')
+  await ctx.send(gameSettings['game-state']['state'])
+
+
+
+@client.command()
+async def update_map(ctx,message="",*,args=""):
+  await map_update(message)
+  await ctx.send("Map updated")
+
+
+
+async def map_update(message=""):
+  logging.info(f'Updating map')
+  players = pull('players','storage/playerDB/')
+  gameSettings = pull('gameSettings','storage/gameDB/')
+  coordinates = []
+  #Save all places of players
+  for player in players.keys():
+    if player == 0:
+      continue
+    if players[player] == 0:
+      continue
+    data = pull(f'{player}','storage/playerDB/players/')
+    coordinates.append([data['gameinfo']['x-location'],data['gameinfo']['y-location']])
+  #Make map
+  colours = [
+    ':white_circle:',
+    ':red_circle:',
+    ':blue_circle:',
+    ':brown_circle:',
+    ':purple_circle:',
+    ':green_circle:',
+    ':yellow_circle:',
+    ':orange_circle:'
+  ]
+  channel = client.get_channel(872409613151141958)
+  await channel.purge(limit=100)
+  map = ""
+  k = 0
+  for i in range(gameSettings['map']['size-y'],0,-1):
+    line = ""
+    for j in range(1,gameSettings['map']['size-x']+1):
+      if [j,i] in coordinates:
+        line = line + colours[k]
+        k += 1
+      else:
+        line += ":black_circle:"
+    await channel.send(line)
+
+
+
+@client.command()
+async def stats(ctx,user:discord.User,*,args=""):
+  if user == None:
+    await ctx.send('No user given')
+    return
+  logging.info(f'Stats command registered, send by: {ctx.author.name} checking {user.name}')
+  players = pull('players','storage/playerDB/')
+  if not(user.id in players.keys()):
+    await ctx.send("That user isn't a player")
+    return
+  if players[user.id] == 0:
+    await ctx.send("Player is dead")
+    return
+
+  data = pull(user.id,'storage/playerDB/players/')
+
+  embed = discord.Embed(title='Player Info')
+  embed.set_author(name=user.name,icon_url=user.avatar_url)
+  embed.add_field(name="lives",value=data['character']['lives'])
+  embed.add_field(name="tokens",value=data['character']['tokens'])
+  embed.add_field(name="location",value=f"{data['gameinfo']['x-location']},{data['gameinfo']['y-location']}")
+
+  await ctx.send(embed=embed)
+
 
 
 #Starting the bot
