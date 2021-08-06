@@ -1,5 +1,5 @@
 repl = True
-if False:  #True if it shouldn't be running, False if it should
+if True:  #True if it shouldn't be running, False if it should
     print('escaping')
     exit()
 
