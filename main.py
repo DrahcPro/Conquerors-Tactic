@@ -29,10 +29,6 @@ async def on_ready():
     await channel.send('We are online')
     logging.info('Bot is online')
 
-    logging.info('Drawing map')
-    #########################
-    await map_update()
-
     gameSettings = pull('gameSettings','storage/gameDB/')
     if gameSettings['game-state']['state'] == 'running':
       now = datetime.datetime.now()
@@ -201,7 +197,7 @@ async def token_loop():
 @client.command() 
 async def start_game(ctx,*,args=''):
   #Does the person have the right role and is in the right channel
-  if permissions(ctx,'Game_master'):
+  if permissions(ctx,'Game_admin'):
     logging.info(f'Start_game command registered but has wrong permissions, send by: {ctx.author.name}')
     await ctx.send('You do not have the given permissions or are in the wrong channel')
     return 
@@ -218,6 +214,19 @@ async def start_game(ctx,*,args=''):
   players = pull('players','storage/playerDB/')
   usedCoords = []
   logging.info('placing players on map')
+
+  emojis = [
+    ':white_circle:',
+    ':red_circle:',
+    ':blue_circle:',
+    ':brown_circle:',
+    ':purple_circle:',
+    ':green_circle:',
+    ':yellow_circle:',
+    ':orange_circle:'
+  ]
+  currentIndex = 0
+
   for i in players.keys():
     if i == 0:
       continue
@@ -237,6 +246,10 @@ async def start_game(ctx,*,args=''):
     data = pull(i, 'storage/playerDB/players/')
     data['gameinfo']['x-location'] = x
     data['gameinfo']['y-location'] = y
+
+    data['info']['emoji'] = emojis[currentIndex]
+    currentIndex += 1
+
     push(data, i, 'storage/playerDB/players/')
 
 
@@ -257,9 +270,9 @@ async def start_game(ctx,*,args=''):
     if i == 0:
       continue
     player = client.get_user(i)
-    await player.send("""
-    The conqueror tactic's game has started!\nYou are a player in the game,\ngood luck and have fun!""")
-    
+    data = pull(i, 'storage/playerDB/players/')
+    await player.send(f"""
+    The conqueror tactic's game has started!\nYou are a player in the game, good luck and have fun!\nYour emoji on the map is {data['info']['emoji']}! Check the map channel to see other players!""")
 
 
   #Change game state
@@ -290,9 +303,6 @@ async def start_game(ctx,*,args=''):
 
   await ctx.send('Game started')
 
-  #########################
-  await map_update()
-
   logging.info('GAME STARTED')
   await asyncio.sleep(waitingTimeH*60*60)
   token_loop.start()
@@ -302,7 +312,7 @@ async def start_game(ctx,*,args=''):
 @client.command() 
 async def stop_game(ctx,*,args=''):
   #Does the person have the right role and is in the right channel
-  if permissions(ctx,'Game_master'):
+  if permissions(ctx,'Game_admin'):
     logging.info(f'Stop_game command registered but has wrong permissions, send by: {ctx.author.name}')
     await ctx.send('You do not have the given permissions or are in the wrong channel')
     return 
@@ -333,9 +343,6 @@ async def stop_game(ctx,*,args=''):
   Congrats to the winner, and we hope to see everyone back for another game!
   """
   await channel.send(message)
-
-  #########################
-  await map_update()
 
   logging.info('GAME STOPPED')
 
@@ -377,9 +384,6 @@ async def pause_game(ctx,*,args=''):
   """
   await channel.send(message)
 
-  #########################
-  await map_update()
-
   logging.info('GAME PAUSED')
 
 
@@ -413,9 +417,6 @@ async def unpause_game(ctx,*,args=''):
   Have fun playing again.
   """
   await channel.send(message)
-  
-  #########################
-  await map_update()
 
   #Start the token loop again
   now = datetime.datetime.now()
@@ -504,8 +505,6 @@ async def kill(ctx,user: discord.User,*,args=""):
         #Remove token(s)
         playerData['character']['tokens'] -= gameSettings['prices']['shooting']
         push(playerData, ctx.author.id, 'storage/playerDB/players/')
-        #########################
-        await map_update()
       else:
         logging.info(f'Author does not have enough tokens')
         await ctx.send("You don't have enough tokens!")
@@ -570,8 +569,7 @@ async def move(ctx,x='-',y='-',*,args=""):
   push(playerData, ctx.author.id, 'storage/playerDB/players/')
   logging.info(f'Move carried out successfully.')
   await ctx.send("You moved (" + str(x) + ", " + str(y) + ")! You are now at position (" + str(playerData['gameinfo']['x-location']) + ", " + str(playerData['gameinfo']['y-location']) + ")")
-  #########################
-  await map_update()
+
 
 
 @client.command()
@@ -668,18 +666,16 @@ async def game_state(ctx,*,args=""):
 
 
 
-@client.command()
-async def update_map(ctx,message="",*,args=""):
-  await map_update(message)
-  await ctx.send("Map updated")
-
-
+@tasks.loop(minutes=1)
+async def refresh_map():
+  await map_update()
 
 async def map_update(message=""):
   logging.info(f'Updating map')
   players = pull('players','storage/playerDB/')
   gameSettings = pull('gameSettings','storage/gameDB/')
   coordinates = []
+  emojis = []
   #Save all places of players
   for player in players.keys():
     if player == 0:
@@ -688,30 +684,39 @@ async def map_update(message=""):
       continue
     data = pull(f'{player}','storage/playerDB/players/')
     coordinates.append([data['gameinfo']['x-location'],data['gameinfo']['y-location']])
+    emojis.append(data['info']['emoji'])
   #Make map
-  colours = [
-    ':white_circle:',
-    ':red_circle:',
-    ':blue_circle:',
-    ':brown_circle:',
-    ':purple_circle:',
-    ':green_circle:',
-    ':yellow_circle:',
-    ':orange_circle:'
-  ]
   channel = client.get_channel(872409613151141958)
   await channel.purge(limit=100)
-  map = ""
-  k = 0
   for i in range(gameSettings['map']['size-y'],0,-1):
     line = ""
     for j in range(1,gameSettings['map']['size-x']+1):
       if [j,i] in coordinates:
-        line = line + colours[k]
-        k += 1
+        index = coordinates.index([j,i])
+        line = line + emojis[index]
       else:
         line += ":black_circle:"
     await channel.send(line)
+
+@client.command()
+async def start_map(ctx,*,args=""):
+  if permissions(ctx,'Game_admin'):
+    logging.info(f'Start_game command registered but has wrong permissions, send by: {ctx.author.name}')
+    await ctx.send('You do not have the given permissions or are in the wrong channel')
+    return
+  logging.info(f'Start_map command registered, send by: {ctx.author.name}')
+  refresh_map.start()
+  await ctx.send('Map refresh started') 
+
+@client.command()
+async def stop_map(ctx,*,args=""):
+  if permissions(ctx,'Game_master'):
+    logging.info(f'Stop_game command registered but has wrong permissions, send by: {ctx.author.name}')
+    await ctx.send('You do not have the given permissions or are in the wrong channel')
+    return
+  logging.info(f'Stop_map command registered, send by: {ctx.author.name}')
+  refresh_map.cancel()
+  await ctx.send('Map refresh stopped')
 
 
 
@@ -735,7 +740,8 @@ async def stats(ctx,user:discord.User,*,args=""):
   embed.set_author(name=user.name,icon_url=user.avatar_url)
   embed.add_field(name="lives",value=data['character']['lives'])
   embed.add_field(name="tokens",value=data['character']['tokens'])
-  embed.add_field(name="location",value=f"{data['gameinfo']['x-location']},{data['gameinfo']['y-location']}")
+  embed.add_field(name="location",value=f"{data['gameinfo']['x-location']}, {data['gameinfo']['y-location']}")
+  embed.add_field(name="map symbol",value=data['info']['emoji'])
 
   await ctx.send(embed=embed)
 

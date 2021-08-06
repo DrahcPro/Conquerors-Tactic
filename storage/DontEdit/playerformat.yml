@@ -1,6 +1,7 @@
 info:
   id: "<id>"
   name: "<name>"
+  emoji: ":white_large_square:" #set default to square so we can see if there is an error
 stats:
   range: 1
   #attack range (in tiles) upgradeable (in a square, so dx==1, dy==1 or dx & dy == 1)
