@@ -1,5 +1,5 @@
 repl = True
-if True:  #True if it shouldn't be running, False if it should
+if False:  #True if it shouldn't be running, False if it should
     print('escaping')
     exit()
 
@@ -11,6 +11,7 @@ import discord, asyncio
 import logging, os, datetime
 import random
 from supervision import embeding
+from mapDraw import draw
 
 #Permanent variables
 testingChannel = 869932614423830588
@@ -225,6 +226,16 @@ async def start_game(ctx,*,args=''):
     ':yellow_circle:',
     ':orange_circle:'
   ]
+  colours = [
+    [255,255,255],
+    [233,45,33],#noo it will look horrible and bright :c
+    [33,126,233],
+    [134, 101, 73],
+    [147, 36, 211],
+    [38, 231, 22],
+    [255, 236, 0],
+    [249, 165, 22]
+  ]
   currentIndex = 0
 
   for i in players.keys():
@@ -248,6 +259,7 @@ async def start_game(ctx,*,args=''):
     data['gameinfo']['y-location'] = y
 
     data['info']['emoji'] = emojis[currentIndex]
+    data['info']['colours'] = colours[currentIndex]
     currentIndex += 1
 
     push(data, i, 'storage/playerDB/players/')
@@ -669,6 +681,7 @@ async def game_state(ctx,*,args=""):
 @tasks.loop(minutes=1)
 async def refresh_map():
   await map_update()
+  pngMap()
 
 async def map_update(message=""):
   logging.info(f'Updating map')
@@ -740,10 +753,34 @@ async def stats(ctx,user:discord.User,*,args=""):
   embed.set_author(name=user.name,icon_url=user.avatar_url)
   embed.add_field(name="lives",value=data['character']['lives'])
   embed.add_field(name="tokens",value=data['character']['tokens'])
+  embed.add_field(name="range",value=data['stats']['range'])
   embed.add_field(name="location",value=f"{data['gameinfo']['x-location']}, {data['gameinfo']['y-location']}")
   embed.add_field(name="map symbol",value=data['info']['emoji'])
 
   await ctx.send(embed=embed)
+
+@client.command()
+async def pngMap(ctx,*,args=""):
+  drawMap()
+  await ctx.send(file=discord.File('map.png'))
+
+def drawMap():
+  players = pull('players','storage/playerDB/')
+  coordinates = []
+  rgblist = []
+  #Save all places of players
+  for player in players.keys():
+    if player == 0:
+      continue
+    if players[player] == 0:
+      continue
+    data = pull(f'{player}','storage/playerDB/players/')
+    coordinates.append([data['gameinfo']['x-location'],data['gameinfo']['y-location']])
+    rgblist.append(data['info']['colours'])
+
+  draw(coordinates,rgblist,20,20)
+
+  
 
 
 

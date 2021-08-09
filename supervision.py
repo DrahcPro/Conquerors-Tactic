@@ -16,17 +16,35 @@ def commandfinder(content):
 def colourwheel(command):
   if command == 'ping':
     return 0x32f011
+  elif command == 'pngMap':
+    return 0x32f011
+  elif command == 'stats':
+    return 0x32f011
+  elif command == 'game_state':
+    return 0x32f011
   elif command == 'create_user':
     return 0x1333e8
   elif command == 'reset_user':
-    return 0x8000ff
+    return 0x1333e8
+  elif command == 'start_map':
+    return 0x1333e8
+  elif command == 'stop_map':
+    return 0x1333e8
   elif command == 'start_game':
+    return 0xff0000
+  elif command == 'pause_game':
+    return 0xff0000
+  elif command == 'unpause_game':
+    return 0xff0000
+  elif command == 'stop_game':
     return 0xff0000
   elif command == 'kill':
     return 0xff6200
   elif command == 'move':
     return 0xfff700
   elif command == 'range_upgrade':
+    return 0xfff700
+  elif command == 'transfer_tokens':
     return 0xfff700
   else:
     return 0x000000
