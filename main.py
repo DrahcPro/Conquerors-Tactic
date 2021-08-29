@@ -121,6 +121,17 @@ async def ping(ctx, arg=""):
 
 
 
+@client.command()
+async def kill_bot(ctx,arg=""):
+    if permissions(ctx,'Game_admin'):
+      logging.info(f'Kill_bot command registered but has wrong permissions, send by: {ctx.author.name}')
+      await ctx.send('You do not have the given permissions or are in the wrong channel')
+      return
+    logging.info(f'Kill_bot command registered, send by: {ctx.author.name}')
+    exit()
+
+
+    
 #Create_user - add a user to the game
 @client.command()
 async def create_user(ctx, *, user: discord.User):
@@ -191,6 +202,8 @@ async def token_loop():
       m = f'0{m}'
     gameSettings['player-income']['latest-income'] = f'{h};{m}'
     push(gameSettings,'gameSettings','storage/gameDB/')
+    channel = client.get_channel(testingChannel)
+    await channel.send('Everybody recieved a token')
 
 
 
